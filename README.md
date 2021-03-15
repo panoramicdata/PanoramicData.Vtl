@@ -1,5 +1,5 @@
 # PanoramicData.Vtl
-A nuget package for processing VTL.
+A nuget package for processing VTL. 
 
 Example use:
 ```C#
