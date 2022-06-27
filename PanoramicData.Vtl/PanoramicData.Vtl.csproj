@@ -4,7 +4,7 @@
 	<TargetFramework>netstandard2.0</TargetFramework>
 	<Nullable>enable</Nullable>
 	<LangVersion>latest</LangVersion>
-	<ApplicationIcon>icon.ico</ApplicationIcon>
+	<ApplicationIcon>Icon.ico</ApplicationIcon>
 	<Authors>Panoramic Data Limited</Authors>
 	<PackageProjectUrl>https://github.com/panoramicdata/PanoramicData.Vtl/</PackageProjectUrl>
 	<Copyright>Copyright © Panoramic Data Limited 2021</Copyright>
