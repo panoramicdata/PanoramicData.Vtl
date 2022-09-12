@@ -10,6 +10,7 @@ namespace PanoramicData.Vtl
     {
         private readonly VtlParserOptions vtlParserOptions;
         private readonly Stack<ParseMode> conditionStack = new();
+        private const char VARIABLE_PREFIX_CHARACTER = '$';
 
         public VtlParser(VtlParserOptions? vtlParserOptions = null)
         {
@@ -129,11 +130,13 @@ namespace PanoramicData.Vtl
 
         private bool Calculate(string text, Dictionary<string, object> variables)
         {
+            var variablePrefixString = vtlParserOptions.VariablePrefixCharacter ?? VARIABLE_PREFIX_CHARACTER;
+
             foreach (var kvp in variables)
             {
                 text = text
-                    .Replace($"${kvp.Key}", kvp.Value.ToString())
-                    .Replace($"${{{kvp.Key}}}", kvp.Value.ToString());
+                    .Replace($"{variablePrefixString}{kvp.Key}", kvp.Value.ToString())
+                    .Replace($"{variablePrefixString}{{{kvp.Key}}}", kvp.Value.ToString());
             }
             var expression = new ExtendedExpression(text);
             return expression.Evaluate() as bool?
@@ -142,12 +145,14 @@ namespace PanoramicData.Vtl
 
         private string Replace(string line, Dictionary<string, object> variables)
         {
+            var variablePrefixString = vtlParserOptions.VariablePrefixCharacter ?? VARIABLE_PREFIX_CHARACTER;
+
             foreach (var variable in variables)
             {
                 // Form: $variableName
-                line = line.Replace($"${variable.Key}", variable.Value.ToString());
+                line = line.Replace($"{variablePrefixString}{variable.Key}", variable.Value.ToString());
                 // Form: ${variableName}
-                line = line.Replace($"${{{variable.Key}}}", variable.Value.ToString());
+                line = line.Replace($"{variablePrefixString}{{{variable.Key}}}", variable.Value.ToString());
             }
             return line;
         }
@@ -159,7 +164,7 @@ namespace PanoramicData.Vtl
             {
                 throw new ParseException("");
             }
-            variables[keyValuePair[0].Trim(' ').TrimStart('$')] = keyValuePair[1].Trim(' ').Trim('"');
+            variables[keyValuePair[0].Trim(' ').TrimStart(VARIABLE_PREFIX_CHARACTER)] = keyValuePair[1].Trim(' ').Trim('"');
         }
 
         public IEnumerable<string> GetLines(string text)

@@ -14,5 +14,10 @@ namespace PanoramicData.Vtl
 		/// The directoryInfo of the directory containing the reference files
 		/// </summary>
 		public DirectoryInfo? ReferenceDirectory { get; set; }
+
+		/// <summary>
+		/// If this is not set, $ will be used as the default variable prefix character
+		/// </summary>
+		public char? VariablePrefixCharacter { get; set; }
 	}
 }

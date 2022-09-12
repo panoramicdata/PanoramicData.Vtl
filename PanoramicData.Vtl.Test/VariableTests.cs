@@ -38,5 +38,21 @@ namespace PanoramicData.Vtl.Test
 
             parsedText.Should().Be("!\r\nhostname TESTHOSTNAME");
         }
+
+        [Fact]
+        public void VariablePrefixParseSucceeds()
+        {
+            const string text = "Test File for +purpose";
+            var variables = new Dictionary<string, object>
+            {
+                ["purpose"] = "testing",
+            };
+            var vtlParser = new VtlParser(new VtlParserOptions { VariablePrefixCharacter = '+'});
+            var isSuccess = vtlParser.TryParse(text, variables, out var parsedText);
+
+            isSuccess.Should().BeTrue();
+
+            parsedText.Should().Be("Test File for testing");
+        }
     }
 }
