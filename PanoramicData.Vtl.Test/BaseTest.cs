@@ -2,9 +2,9 @@
 
 public abstract class BaseTest
 {
-	protected BaseTest(VtlParserOptions? vtlParserOptions = null)
+	protected BaseTest()
 	{
-		VtlParser = new VtlParser(vtlParserOptions ?? new());
+		VtlParser = new VtlParser(new());
 	}
 
 	public VtlParser VtlParser { get; }
