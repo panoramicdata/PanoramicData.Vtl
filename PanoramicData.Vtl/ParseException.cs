@@ -1,25 +1,24 @@
 ﻿using System;
 using System.Runtime.Serialization;
 
-namespace PanoramicData.Vtl
+namespace PanoramicData.Vtl;
+
+[Serializable]
+public class ParseException : Exception
 {
-	[Serializable]
-	internal class ParseException : Exception
+	public ParseException()
 	{
-		public ParseException()
-		{
-		}
+	}
 
-		public ParseException(string message) : base(message)
-		{
-		}
+	public ParseException(string message) : base(message)
+	{
+	}
 
-		public ParseException(string message, Exception innerException) : base(message, innerException)
-		{
-		}
+	public ParseException(string message, Exception innerException) : base(message, innerException)
+	{
+	}
 
-		protected ParseException(SerializationInfo info, StreamingContext context) : base(info, context)
-		{
-		}
+	protected ParseException(SerializationInfo info, StreamingContext context) : base(info, context)
+	{
 	}
 }

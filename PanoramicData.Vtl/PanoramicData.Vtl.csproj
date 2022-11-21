@@ -7,7 +7,7 @@
 	<ApplicationIcon>Icon.ico</ApplicationIcon>
 	<Authors>Panoramic Data Limited</Authors>
 	<PackageProjectUrl>https://github.com/panoramicdata/PanoramicData.Vtl/</PackageProjectUrl>
-	<Copyright>Copyright © Panoramic Data Limited 2021</Copyright>
+	<Copyright>Copyright © Panoramic Data Limited 2021, 2022</Copyright>
 	<PackageLicenseUrl></PackageLicenseUrl>
 	<PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
 	<PackageIcon>Icon.png</PackageIcon>

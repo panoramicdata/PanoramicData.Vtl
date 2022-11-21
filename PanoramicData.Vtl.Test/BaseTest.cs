@@ -1,12 +1,11 @@
-﻿namespace PanoramicData.Vtl.Test
-{
-	public abstract class BaseTest
-	{
-		protected BaseTest(VtlParserOptions? vtlParserOptions = null)
-		{
-			VtlParser = new VtlParser(vtlParserOptions);
-		}
+﻿namespace PanoramicData.Vtl.Test;
 
-		public VtlParser VtlParser { get; }
+public abstract class BaseTest
+{
+	protected BaseTest(VtlParserOptions? vtlParserOptions = null)
+	{
+		VtlParser = new VtlParser(vtlParserOptions);
 	}
+
+	public VtlParser VtlParser { get; }
 }
