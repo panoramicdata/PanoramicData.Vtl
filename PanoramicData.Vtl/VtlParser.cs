@@ -126,6 +126,9 @@ public class VtlParser
 					case ParseMode.ElseActive:
 						sb.Append(Replace(line, variables));
 						break;
+					default:
+						// Do nothing
+						break;
 				}
 			}
 
