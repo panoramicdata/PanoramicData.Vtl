@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Runtime.Serialization;
 
 namespace PanoramicData.Vtl;
 
@@ -15,10 +14,6 @@ public class ParseException : Exception
 	}
 
 	public ParseException(string message, Exception innerException) : base(message, innerException)
-	{
-	}
-
-	protected ParseException(SerializationInfo info, StreamingContext context) : base(info, context)
 	{
 	}
 }

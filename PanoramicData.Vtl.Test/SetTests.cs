@@ -1,4 +1,4 @@
-using FluentAssertions;
+using AwesomeAssertions;
 using System.Collections.Generic;
 using Xunit;
 
@@ -15,7 +15,7 @@ public class SetTests : BaseTest
 
 		isSuccess.Should().BeTrue();
 		parsedText.Should().Be(string.Empty);
-		variables.ContainsKey("message").Should().BeTrue();
+		variables.Should().ContainKey("message");
 		variables["message"].Should().Be("Hello World");
 	}
 }
