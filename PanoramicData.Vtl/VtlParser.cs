@@ -6,24 +6,48 @@ using System.Text;
 
 namespace PanoramicData.Vtl;
 
+/// <summary>
+/// Parses and evaluates Velocity Template Language (VTL) templates.
+/// </summary>
 public class VtlParser
 {
 	private readonly VtlParserOptions _vtlParserOptions;
 	private readonly Stack<ParseMode> _conditionStack = new();
 	private const char VARIABLE_PREFIX_CHARACTER = '$';
 
+	/// <summary>
+	/// Initializes a new instance of the <see cref="VtlParser"/> class with default options.
+	/// </summary>
 	public VtlParser() : this(new())
 	{
 	}
 
+	/// <summary>
+	/// Initializes a new instance of the <see cref="VtlParser"/> class with the specified options.
+	/// </summary>
+	/// <param name="vtlParserOptions">The parser options.</param>
 	public VtlParser(VtlParserOptions vtlParserOptions)
 	{
 		_vtlParserOptions = vtlParserOptions;
 	}
 
+	/// <summary>
+	/// Attempts to parse and evaluate a VTL template from a file.
+	/// </summary>
+	/// <param name="fileInfo">The file containing the VTL template.</param>
+	/// <param name="variables">The variables to use during evaluation.</param>
+	/// <param name="result">The evaluated output, or an empty string if parsing fails.</param>
+	/// <returns><c>true</c> if parsing succeeded; otherwise, <c>false</c>.</returns>
 	public bool TryParse(FileInfo fileInfo, Dictionary<string, object> variables, out string result)
 		=> TryParse(File.ReadAllText(fileInfo.FullName), variables, out result);
 
+	/// <summary>
+	/// Attempts to parse and evaluate a VTL template from a string.
+	/// </summary>
+	/// <param name="text">The VTL template text.</param>
+	/// <param name="variables">The variables to use during evaluation.</param>
+	/// <param name="result">The evaluated output, or an empty string if parsing fails.</param>
+	/// <returns><c>true</c> if parsing succeeded; otherwise, <c>false</c>.</returns>
 	public bool TryParse(string text, Dictionary<string, object> variables, out string result)
 	{
 		try
@@ -184,6 +208,11 @@ public class VtlParser
 		variables[keyValuePair[0].Trim(' ').TrimStart(VARIABLE_PREFIX_CHARACTER)] = keyValuePair[1].Trim(' ').Trim('"');
 	}
 
+	/// <summary>
+	/// Splits the specified text into lines, preserving newline characters.
+	/// </summary>
+	/// <param name="text">The text to split.</param>
+	/// <returns>An enumerable of lines.</returns>
 	public IEnumerable<string> GetLines(string text)
 	{
 		var autoDetectedNewlineString = text.Any(t => t == '\r')

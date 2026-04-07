@@ -1,3 +1,5 @@
+root = true
+
 # Rules in this file were initially inferred by Visual Studio IntelliCode from the F:\Projects\PanoramicData.ReportMagic\2.x codebase based on best match to current usage at 05/12/2018
 # You can modify the rules from these initially generated values to suit your own policies
 # You can learn more about editorconfig here: https://docs.microsoft.com/en-us/visualstudio/ide/editorconfig-code-style-settings-reference
@@ -144,3 +146,4 @@ csharp_style_prefer_top_level_statements = true:silent
 #dotnet_naming_style.constant_field_style.required_prefix = _ NOPE.
 
 # TODO: Fields that are public static readonly must be PascalCase
+csharp_style_namespace_declarations = file_scoped:error

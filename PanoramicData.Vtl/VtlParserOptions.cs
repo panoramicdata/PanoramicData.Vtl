@@ -2,6 +2,9 @@
 
 namespace PanoramicData.Vtl;
 
+/// <summary>
+/// Configuration options for the <see cref="VtlParser"/>.
+/// </summary>
 public class VtlParserOptions
 {
 	/// <summary>
