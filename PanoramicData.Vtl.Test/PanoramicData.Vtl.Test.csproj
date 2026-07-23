@@ -29,6 +29,11 @@
     <ProjectReference Include="..\PanoramicData.Vtl\PanoramicData.Vtl.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <None Update="xunit.runner.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Update="Nerdbank.GitVersioning" />
   </ItemGroup>
 </Project>
