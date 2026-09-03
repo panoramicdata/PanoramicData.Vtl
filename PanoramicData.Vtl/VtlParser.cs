@@ -16,6 +16,19 @@ public class VtlParser
 	private const char VARIABLE_PREFIX_CHARACTER = '$';
 
 	/// <summary>
+	/// The parse modes in which template content is written to the output.
+	/// </summary>
+	private static readonly ParseMode[] EmittingModes =
+	[
+		ParseMode.Root,
+		ParseMode.Normal,
+		ParseMode.ForEach,
+		ParseMode.IfActive,
+		ParseMode.ElseIfActive,
+		ParseMode.ElseActive,
+	];
+
+	/// <summary>
 	/// Initializes a new instance of the <see cref="VtlParser"/> class with default options.
 	/// </summary>
 	public VtlParser() : this(new())
@@ -52,111 +65,7 @@ public class VtlParser
 	{
 		try
 		{
-			_conditionStack.Push(ParseMode.Root);
-			var sb = new StringBuilder();
-			var lineNumber = 0;
-			foreach (var line in GetLines(text))
-			{
-				lineNumber++;
-
-				// Set support
-				var trimmedLine = line.TrimEnd();
-				if (trimmedLine.StartsWith("#set (") && trimmedLine.EndsWith(")"))
-				{
-					ProcessSet(line.Substring("#set (".Length, trimmedLine.Length - "#set ()".Length), variables);
-					continue;
-				}
-
-				// Conditional support (if/elseif/else/end)
-				if (trimmedLine.StartsWith("#if (") && trimmedLine.EndsWith(")"))
-				{
-					var ifExpression = trimmedLine.Substring("#if (".Length, trimmedLine.Length - "#if ()".Length);
-					_conditionStack.Push(Calculate(ifExpression, variables)
-						? ParseMode.IfActive
-						: ParseMode.IfInactive);
-					continue;
-				}
-
-				if (trimmedLine.StartsWith("#elseif (") && trimmedLine.EndsWith(")"))
-				{
-					switch (_conditionStack.Pop())
-					{
-						case ParseMode.IfActive:
-						case ParseMode.ElseIfActive:
-							_conditionStack.Push(ParseMode.IfHandled);
-							break;
-						case ParseMode.IfInactive:
-						case ParseMode.ElseIfInactive:
-							_conditionStack.Push(Calculate(trimmedLine.Substring("#elseif (".Length, trimmedLine.Length - "#elseif ()".Length), variables)
-								? ParseMode.ElseIfActive
-								: ParseMode.ElseIfInactive);
-							break;
-						default:
-							throw new ParseException($"Unexpected elseif on line {lineNumber}");
-					}
-
-					continue;
-				}
-
-				if (trimmedLine.StartsWith("#else"))
-				{
-					var parseMode = _conditionStack.Pop();
-					switch (parseMode)
-					{
-						case ParseMode.IfActive:
-						case ParseMode.ElseIfActive:
-						case ParseMode.IfHandled:
-							_conditionStack.Push(ParseMode.IfHandled);
-							break;
-						case ParseMode.IfInactive:
-						case ParseMode.ElseIfInactive:
-							_conditionStack.Push(ParseMode.ElseActive);
-							break;
-						default:
-							throw new ParseException($"Unexpected elseif on line {lineNumber}");
-					}
-
-					continue;
-				}
-
-				if (trimmedLine.StartsWith("#end"))
-				{
-					if (_conditionStack.Count == 0)
-					{
-						throw new ParseException($"Unexpected end on line {lineNumber}");
-					}
-
-					_conditionStack.Pop();
-					continue;
-				}
-
-				// TODO - loops support (foreach/end)
-				// TODO - include support
-				// TODO - parse support
-				// TODO - evaluate support
-				// TODO - break support
-				// TODO - stop support
-				// TODO - velocimacros support
-				// TODO - math support
-				// TODO - range operator support
-
-				switch (_conditionStack.Peek())
-				{
-					case ParseMode.Root:
-					case ParseMode.Normal:
-					case ParseMode.ForEach:
-					case ParseMode.IfActive:
-					case ParseMode.ElseIfActive:
-					case ParseMode.ElseActive:
-						sb.Append(Replace(line, variables));
-						break;
-					default:
-						// Do nothing
-						break;
-				}
-			}
-
-			result = sb.ToString();
+			result = Parse(text, variables);
 			return true;
 		}
 		catch (ParseException)
@@ -165,6 +74,151 @@ public class VtlParser
 			return false;
 		}
 	}
+
+	// TODO - loops support (foreach/end)
+	// TODO - include support
+	// TODO - parse support
+	// TODO - evaluate support
+	// TODO - break support
+	// TODO - stop support
+	// TODO - velocimacros support
+	// TODO - math support
+	// TODO - range operator support
+	private string Parse(string text, Dictionary<string, object> variables)
+	{
+		_conditionStack.Push(ParseMode.Root);
+		var sb = new StringBuilder();
+		var lineNumber = 0;
+		foreach (var line in GetLines(text))
+		{
+			lineNumber++;
+
+			if (TryProcessDirective(line.TrimEnd(), lineNumber, variables))
+			{
+				continue;
+			}
+
+			if (IsEmitting)
+			{
+				sb.Append(Replace(line, variables));
+			}
+		}
+
+		return sb.ToString();
+	}
+
+	/// <summary>
+	/// Processes the line if it is a directive.
+	/// </summary>
+	/// <returns><c>true</c> if the line was a directive and has been processed; otherwise, <c>false</c>.</returns>
+	private bool TryProcessDirective(string trimmedLine, int lineNumber, Dictionary<string, object> variables)
+	{
+		if (TryGetDirectiveArgument(trimmedLine, "#set", out var setSpec))
+		{
+			ProcessSet(setSpec, variables);
+			return true;
+		}
+
+		if (TryGetDirectiveArgument(trimmedLine, "#if", out var ifExpression))
+		{
+			ProcessIf(ifExpression, variables);
+			return true;
+		}
+
+		if (TryGetDirectiveArgument(trimmedLine, "#elseif", out var elseIfExpression))
+		{
+			ProcessElseIf(elseIfExpression, lineNumber, variables);
+			return true;
+		}
+
+		if (trimmedLine.StartsWith("#else"))
+		{
+			ProcessElse(lineNumber);
+			return true;
+		}
+
+		if (trimmedLine.StartsWith("#end"))
+		{
+			ProcessEnd(lineNumber);
+			return true;
+		}
+
+		return false;
+	}
+
+	/// <summary>
+	/// Extracts the parenthesised argument of a directive, e.g. "$foo &lt; 10" from "#if ( $foo &lt; 10 )".
+	/// </summary>
+	/// <returns><c>true</c> if the line is the specified directive; otherwise, <c>false</c>.</returns>
+	private static bool TryGetDirectiveArgument(string trimmedLine, string directive, out string argument)
+	{
+		var prefix = $"{directive} (";
+		if (trimmedLine.StartsWith(prefix) && trimmedLine.EndsWith(")"))
+		{
+			argument = trimmedLine.Substring(prefix.Length, trimmedLine.Length - prefix.Length - 1);
+			return true;
+		}
+
+		argument = string.Empty;
+		return false;
+	}
+
+	private void ProcessIf(string expression, Dictionary<string, object> variables)
+		=> _conditionStack.Push(Calculate(expression, variables)
+			? ParseMode.IfActive
+			: ParseMode.IfInactive);
+
+	private void ProcessElseIf(string expression, int lineNumber, Dictionary<string, object> variables)
+	{
+		switch (_conditionStack.Pop())
+		{
+			case ParseMode.IfActive:
+			case ParseMode.ElseIfActive:
+				_conditionStack.Push(ParseMode.IfHandled);
+				break;
+			case ParseMode.IfInactive:
+			case ParseMode.ElseIfInactive:
+				_conditionStack.Push(Calculate(expression, variables)
+					? ParseMode.ElseIfActive
+					: ParseMode.ElseIfInactive);
+				break;
+			default:
+				throw new ParseException($"Unexpected elseif on line {lineNumber}");
+		}
+	}
+
+	private void ProcessElse(int lineNumber)
+	{
+		switch (_conditionStack.Pop())
+		{
+			case ParseMode.IfActive:
+			case ParseMode.ElseIfActive:
+			case ParseMode.IfHandled:
+				_conditionStack.Push(ParseMode.IfHandled);
+				break;
+			case ParseMode.IfInactive:
+			case ParseMode.ElseIfInactive:
+				_conditionStack.Push(ParseMode.ElseActive);
+				break;
+			default:
+				throw new ParseException($"Unexpected else on line {lineNumber}");
+		}
+	}
+
+	private void ProcessEnd(int lineNumber)
+	{
+		if (_conditionStack.Count == 0)
+		{
+			throw new ParseException($"Unexpected end on line {lineNumber}");
+		}
+
+		_conditionStack.Pop();
+	}
+
+	/// <summary>
+	/// Whether the current parse mode writes template content to the output.
+	/// </summary>
+	private bool IsEmitting => EmittingModes.Contains(_conditionStack.Peek());
 
 	private bool Calculate(string text, Dictionary<string, object> variables)
 	{
