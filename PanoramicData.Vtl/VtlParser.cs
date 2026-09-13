@@ -12,21 +12,7 @@ namespace PanoramicData.Vtl;
 public class VtlParser
 {
 	private readonly VtlParserOptions _vtlParserOptions;
-	private readonly Stack<ParseMode> _conditionStack = new();
 	private const char VARIABLE_PREFIX_CHARACTER = '$';
-
-	/// <summary>
-	/// The parse modes in which template content is written to the output.
-	/// </summary>
-	private static readonly ParseMode[] EmittingModes =
-	[
-		ParseMode.Root,
-		ParseMode.Normal,
-		ParseMode.ForEach,
-		ParseMode.IfActive,
-		ParseMode.ElseIfActive,
-		ParseMode.ElseActive,
-	];
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="VtlParser"/> class with default options.
@@ -86,21 +72,21 @@ public class VtlParser
 	// TODO - range operator support
 	private string Parse(string text, Dictionary<string, object> variables)
 	{
-		_conditionStack.Push(ParseMode.Root);
+		var parseModeStack = new ParseModeStack();
 		var sb = new StringBuilder();
 		var lineNumber = 0;
 		foreach (var line in GetLines(text))
 		{
 			lineNumber++;
 
-			if (TryProcessDirective(line.TrimEnd(), lineNumber, variables))
+			if (TryProcessDirective(line.TrimEnd(), lineNumber, variables, parseModeStack))
 			{
 				continue;
 			}
 
-			if (IsEmitting)
+			if (parseModeStack.IsEmitting)
 			{
-				sb.Append(Replace(line, variables));
+				sb.Append(Substitute(line, variables));
 			}
 		}
 
@@ -111,7 +97,11 @@ public class VtlParser
 	/// Processes the line if it is a directive.
 	/// </summary>
 	/// <returns><c>true</c> if the line was a directive and has been processed; otherwise, <c>false</c>.</returns>
-	private bool TryProcessDirective(string trimmedLine, int lineNumber, Dictionary<string, object> variables)
+	private bool TryProcessDirective(
+		string trimmedLine,
+		int lineNumber,
+		Dictionary<string, object> variables,
+		ParseModeStack parseModeStack)
 	{
 		if (TryGetDirectiveArgument(trimmedLine, "#set", out var setSpec))
 		{
@@ -121,25 +111,25 @@ public class VtlParser
 
 		if (TryGetDirectiveArgument(trimmedLine, "#if", out var ifExpression))
 		{
-			ProcessIf(ifExpression, variables);
+			parseModeStack.If(Calculate(ifExpression, variables));
 			return true;
 		}
 
 		if (TryGetDirectiveArgument(trimmedLine, "#elseif", out var elseIfExpression))
 		{
-			ProcessElseIf(elseIfExpression, lineNumber, variables);
+			parseModeStack.ElseIf(() => Calculate(elseIfExpression, variables), lineNumber);
 			return true;
 		}
 
 		if (trimmedLine.StartsWith("#else"))
 		{
-			ProcessElse(lineNumber);
+			parseModeStack.Else(lineNumber);
 			return true;
 		}
 
 		if (trimmedLine.StartsWith("#end"))
 		{
-			ProcessEnd(lineNumber);
+			parseModeStack.End(lineNumber);
 			return true;
 		}
 
@@ -163,95 +153,38 @@ public class VtlParser
 		return false;
 	}
 
-	private void ProcessIf(string expression, Dictionary<string, object> variables)
-		=> _conditionStack.Push(Calculate(expression, variables)
-			? ParseMode.IfActive
-			: ParseMode.IfInactive);
-
-	private void ProcessElseIf(string expression, int lineNumber, Dictionary<string, object> variables)
+	private bool Calculate(string text, Dictionary<string, object> variables)
 	{
-		switch (_conditionStack.Pop())
-		{
-			case ParseMode.IfActive:
-			case ParseMode.ElseIfActive:
-				_conditionStack.Push(ParseMode.IfHandled);
-				break;
-			case ParseMode.IfInactive:
-			case ParseMode.ElseIfInactive:
-				_conditionStack.Push(Calculate(expression, variables)
-					? ParseMode.ElseIfActive
-					: ParseMode.ElseIfInactive);
-				break;
-			default:
-				throw new ParseException($"Unexpected elseif on line {lineNumber}");
-		}
-	}
-
-	private void ProcessElse(int lineNumber)
-	{
-		switch (_conditionStack.Pop())
-		{
-			case ParseMode.IfActive:
-			case ParseMode.ElseIfActive:
-			case ParseMode.IfHandled:
-				_conditionStack.Push(ParseMode.IfHandled);
-				break;
-			case ParseMode.IfInactive:
-			case ParseMode.ElseIfInactive:
-				_conditionStack.Push(ParseMode.ElseActive);
-				break;
-			default:
-				throw new ParseException($"Unexpected else on line {lineNumber}");
-		}
-	}
-
-	private void ProcessEnd(int lineNumber)
-	{
-		if (_conditionStack.Count == 0)
-		{
-			throw new ParseException($"Unexpected end on line {lineNumber}");
-		}
-
-		_conditionStack.Pop();
+		var expressionText = Substitute(text, variables);
+		var expression = new ExtendedExpression(expressionText);
+		return expression.Evaluate() as bool?
+			?? throw new ParseException($"Function does not evaluate as a boolean: '{expressionText}'");
 	}
 
 	/// <summary>
-	/// Whether the current parse mode writes template content to the output.
+	/// Replaces each variable reference in the specified text with the variable's value.
 	/// </summary>
-	private bool IsEmitting => EmittingModes.Contains(_conditionStack.Peek());
-
-	private bool Calculate(string text, Dictionary<string, object> variables)
-	{
-		var variablePrefixString = _vtlParserOptions.VariablePrefixCharacter ?? VARIABLE_PREFIX_CHARACTER;
-
-		foreach (var kvp in variables)
-		{
-			text = text
-				.Replace($"{variablePrefixString}{kvp.Key}", kvp.Value.ToString())
-				.Replace($"{variablePrefixString}{{{kvp.Key}}}", kvp.Value.ToString());
-		}
-
-		var expression = new ExtendedExpression(text);
-		return expression.Evaluate() as bool?
-			?? throw new ParseException($"Function does not evaluate as a boolean: '{text}'");
-	}
-
-	private string Replace(string line, Dictionary<string, object> variables)
+	/// <param name="text">The text in which to substitute variables.</param>
+	/// <param name="variables">The variables to substitute.</param>
+	/// <returns>The text, with all known variable references replaced.</returns>
+	private string Substitute(string text, Dictionary<string, object> variables)
 	{
 		var variablePrefixString = _vtlParserOptions.VariablePrefixCharacter ?? VARIABLE_PREFIX_CHARACTER;
 
 		foreach (var variable in variables)
 		{
-			// Form: $variableName
-			line = line.Replace($"{variablePrefixString}{variable.Key}", variable.Value.ToString());
-			// Form: ${variableName}
-			line = line.Replace($"{variablePrefixString}{{{variable.Key}}}", variable.Value.ToString());
+			var value = variable.Value.ToString();
+			text = text
+				// Form: $variableName
+				.Replace($"{variablePrefixString}{variable.Key}", value)
+				// Form: ${variableName}
+				.Replace($"{variablePrefixString}{{{variable.Key}}}", value);
 		}
 
-		return line;
+		return text;
 	}
 
-	private void ProcessSet(string setSpec, Dictionary<string, object> variables)
+	private static void ProcessSet(string setSpec, Dictionary<string, object> variables)
 	{
 		var keyValuePair = setSpec.Split('=');
 		if (keyValuePair.Length != 2)
@@ -269,23 +202,22 @@ public class VtlParser
 	/// <returns>An enumerable of lines.</returns>
 	public IEnumerable<string> GetLines(string text)
 	{
-		var autoDetectedNewlineString = text.Any(t => t == '\r')
-			? "\r\n"
-			: "\n";
+		var newLineString = _vtlParserOptions.NewLineOverride
+			?? (text.Any(t => t == '\r') ? "\r\n" : "\n");
 		var sb = new StringBuilder();
-		for (var cursor = 0; cursor < text.Length; cursor++)
+		foreach (var character in text)
 		{
-			switch (text[cursor])
+			switch (character)
 			{
 				case '\r':
 					break;
 				case '\n':
-					sb.Append(_vtlParserOptions.NewLineOverride ?? autoDetectedNewlineString);
+					sb.Append(newLineString);
 					yield return sb.ToString();
 					sb.Clear();
 					break;
 				default:
-					sb.Append(text[cursor]);
+					sb.Append(character);
 					break;
 			}
 		}
