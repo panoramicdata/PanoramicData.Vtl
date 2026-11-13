@@ -7,6 +7,8 @@
 
 A nuget package for processing VTL. 
 
+Supports .NET 11.0.
+
 Example use:
 ```C#
 const string text =
